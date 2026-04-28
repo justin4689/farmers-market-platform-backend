@@ -15,4 +15,5 @@ interface ProductRepositoryInterface
     public function findByCategory(int $categoryId): Collection;
     public function withCategory(): Collection;
     public function findWithCategory(int $id): ?Product;
+    public function findByIds(array $ids): Collection;
 }

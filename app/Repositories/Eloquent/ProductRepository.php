@@ -51,4 +51,9 @@ class ProductRepository implements ProductRepositoryInterface
     {
         return $this->model->with('category')->find($id);
     }
+
+    public function findByIds(array $ids): Collection
+    {
+        return $this->model->whereIn('id', $ids)->get();
+    }
 }
