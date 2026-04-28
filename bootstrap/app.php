@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\IsAdmin;
+use App\Http\Middleware\IsAdminOrSupervisor;
 use App\Http\Middleware\IsOperatorOrAbove;
 use App\Http\Middleware\IsSupervisor;
 use Illuminate\Foundation\Application;
@@ -16,9 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'role.admin'            => IsAdmin::class,
-            'role.supervisor'       => IsSupervisor::class,
+            'role.admin'             => IsAdmin::class,
+            'role.supervisor'        => IsSupervisor::class,
             'role.operator_or_above' => IsOperatorOrAbove::class,
+            'role.admin_or_supervisor' => IsAdminOrSupervisor::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

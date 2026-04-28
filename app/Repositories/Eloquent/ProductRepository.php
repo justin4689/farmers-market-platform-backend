@@ -46,4 +46,9 @@ class ProductRepository implements ProductRepositoryInterface
     {
         return $this->model->with('category')->get();
     }
+
+    public function findWithCategory(int $id): ?Product
+    {
+        return $this->model->with('category')->find($id);
+    }
 }
