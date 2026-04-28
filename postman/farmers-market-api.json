@@ -1,0 +1,574 @@
+{
+  "info": {
+    "name": "Farmers Market API",
+    "description": "REST API for an agricultural marketplace in Côte d'Ivoire. Farmers purchase pesticides, fertilizers, and seeds; paying cash or on credit repaid with cacao commodities.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
+    { "key": "token",    "value": "",                     "type": "string" }
+  ],
+  "item": [
+
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.success && json.data && json.data.token) {",
+                  "    pm.collectionVariables.set('token', json.data.token);",
+                  "    pm.environment.set('token', json.data.token);",
+                  "    console.log('Token saved: ' + json.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/login", "host": ["{{base_url}}"], "path": ["api", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"operator1@xpertbot.com\",\n  \"password\": \"password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Authenticate with any seeded account. The test script automatically saves the returned token to the collection variable `token`.\n\nDemo accounts:\n- admin@xpertbot.com / password\n- supervisor1@xpertbot.com / password\n- operator1@xpertbot.com / password"
+          },
+          "response": [
+            {
+              "name": "200 OK — Login successful",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"token\": \"1|abcdefghijklmnopqrstuvwxyz1234567890\",\n    \"user\": {\n      \"id\": 4,\n      \"name\": \"Amara Operator\",\n      \"email\": \"operator1@xpertbot.com\",\n      \"role\": \"operator\",\n      \"created_by\": 2,\n      \"created_at\": \"2026-04-28T12:00:00.000000Z\"\n    }\n  },\n  \"message\": \"Login successful.\"\n}"
+            },
+            {
+              "name": "401 Unauthorized — Wrong credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Invalid email or password.\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/logout", "host": ["{{base_url}}"], "path": ["api", "logout"] },
+            "description": "Revokes the current Sanctum token."
+          },
+          "response": [
+            {
+              "name": "200 OK — Logged out",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [],\n  \"message\": \"Logged out successfully.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create Supervisor (Admin only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/admin/supervisors", "host": ["{{base_url}}"], "path": ["api", "admin", "supervisors"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Kone Supervisor\",\n  \"email\": \"kone.supervisor@xpertbot.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Requires admin token. Creates a supervisor account with `created_by` set to the authenticated admin."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 7,\n    \"name\": \"Kone Supervisor\",\n    \"email\": \"kone.supervisor@xpertbot.com\",\n    \"role\": \"supervisor\",\n    \"created_by\": 1,\n    \"created_at\": \"2026-04-28T15:00:00.000000Z\"\n  },\n  \"message\": \"Supervisor created successfully.\"\n}"
+            },
+            {
+              "name": "403 Forbidden — Not admin",
+              "status": "Forbidden",
+              "code": 403,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Forbidden. Admin access required.\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Operator (Supervisor only)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/supervisor/operators", "host": ["{{base_url}}"], "path": ["api", "supervisor", "operators"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Diallo Operator\",\n  \"email\": \"diallo.operator@xpertbot.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Requires supervisor token. Creates an operator account with `created_by` set to the authenticated supervisor."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 8,\n    \"name\": \"Diallo Operator\",\n    \"email\": \"diallo.operator@xpertbot.com\",\n    \"role\": \"operator\",\n    \"created_by\": 2,\n    \"created_at\": \"2026-04-28T15:00:00.000000Z\"\n  },\n  \"message\": \"Operator created successfully.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "List Categories (tree)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/categories", "host": ["{{base_url}}"], "path": ["api", "categories"] },
+            "description": "Returns all categories as a recursive tree. Each root node contains its `children` array."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": 1,\n      \"name\": \"Pesticides\",\n      \"parent_id\": null,\n      \"children\": [\n        { \"id\": 2, \"name\": \"Herbicides\",   \"parent_id\": 1, \"children\": [] },\n        { \"id\": 3, \"name\": \"Insecticides\", \"parent_id\": 1, \"children\": [] },\n        { \"id\": 4, \"name\": \"Fongicides\",   \"parent_id\": 1, \"children\": [] }\n      ]\n    },\n    {\n      \"id\": 5,\n      \"name\": \"Engrais\",\n      \"parent_id\": null,\n      \"children\": [\n        { \"id\": 6, \"name\": \"NPK\",               \"parent_id\": 5, \"children\": [] },\n        { \"id\": 7, \"name\": \"Urée\",              \"parent_id\": 5, \"children\": [] },\n        { \"id\": 8, \"name\": \"Engrais organiques\", \"parent_id\": 5, \"children\": [] }\n      ]\n    }\n  ],\n  \"message\": \"Categories retrieved successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/categories", "host": ["{{base_url}}"], "path": ["api", "categories"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Matériel agricole\",\n  \"parent_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Admin or Supervisor only. Set `parent_id` to an existing category id to create a sub-category."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 13,\n    \"name\": \"Matériel agricole\",\n    \"parent_id\": null,\n    \"children\": []\n  },\n  \"message\": \"Category created successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Category",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/categories/13", "host": ["{{base_url}}"], "path": ["api", "categories", "13"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Outillage agricole\",\n  \"parent_id\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 13,\n    \"name\": \"Outillage agricole\",\n    \"parent_id\": null,\n    \"children\": []\n  },\n  \"message\": \"Category updated successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Category",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/categories/13", "host": ["{{base_url}}"], "path": ["api", "categories", "13"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [],\n  \"message\": \"Category deleted successfully.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List Products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/products", "host": ["{{base_url}}"], "path": ["api", "products"] },
+            "description": "Returns all products with their category (id + name) embedded."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": 1,\n      \"name\": \"Roundup 1L\",\n      \"price_fcfa\": 8500,\n      \"description\": \"Herbicide systémique à base de glyphosate\",\n      \"category\": { \"id\": 2, \"name\": \"Herbicides\" },\n      \"created_at\": \"2026-04-28T12:00:00.000000Z\"\n    }\n  ],\n  \"message\": \"Products retrieved successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Show Product",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/products/1", "host": ["{{base_url}}"], "path": ["api", "products", "1"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 1,\n    \"name\": \"Roundup 1L\",\n    \"price_fcfa\": 8500,\n    \"description\": \"Herbicide systémique à base de glyphosate\",\n    \"category\": { \"id\": 2, \"name\": \"Herbicides\" },\n    \"created_at\": \"2026-04-28T12:00:00.000000Z\"\n  },\n  \"message\": \"Product retrieved successfully.\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Product not found.\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/products", "host": ["{{base_url}}"], "path": ["api", "products"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glyphosate 500ml\",\n  \"category_id\": 2,\n  \"price_fcfa\": 4200,\n  \"description\": \"Herbicide concentré, dilution 1/100\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Admin or Supervisor only. `category_id` must reference an existing category."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 24,\n    \"name\": \"Glyphosate 500ml\",\n    \"price_fcfa\": 4200,\n    \"description\": \"Herbicide concentré, dilution 1/100\",\n    \"category\": { \"id\": 2, \"name\": \"Herbicides\" },\n    \"created_at\": \"2026-04-28T15:30:00.000000Z\"\n  },\n  \"message\": \"Product created successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/products/24", "host": ["{{base_url}}"], "path": ["api", "products", "24"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Glyphosate 500ml Pro\",\n  \"category_id\": 2,\n  \"price_fcfa\": 4500,\n  \"description\": \"Formulation professionnelle renforcée\"\n}",
+              "options": { "raw": { "language": "json" } }
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 24,\n    \"name\": \"Glyphosate 500ml Pro\",\n    \"price_fcfa\": 4500,\n    \"description\": \"Formulation professionnelle renforcée\",\n    \"category\": { \"id\": 2, \"name\": \"Herbicides\" },\n    \"created_at\": \"2026-04-28T15:30:00.000000Z\"\n  },\n  \"message\": \"Product updated successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/products/24", "host": ["{{base_url}}"], "path": ["api", "products", "24"] }
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [],\n  \"message\": \"Product deleted successfully.\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Farmers",
+      "item": [
+        {
+          "name": "Search Farmers",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/farmers/search?q=CI-2024",
+              "host": ["{{base_url}}"],
+              "path": ["api", "farmers", "search"],
+              "query": [{ "key": "q", "value": "CI-2024", "description": "Search term — matches identifier or phone_number" }]
+            },
+            "description": "Search by farmer identifier (e.g. `CI-2024-001`) or phone number. Returns `total_outstanding_debt` for each result."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": 1,\n      \"identifier\": \"CI-2024-001\",\n      \"firstname\": \"Konan\",\n      \"lastname\": \"Kouassi\",\n      \"phone_number\": \"+22507010001\",\n      \"credit_limit_fcfa\": 100000,\n      \"total_outstanding_debt\": 6400,\n      \"created_at\": \"2026-04-28T12:00:00.000000Z\"\n    }\n  ],\n  \"message\": \"Search results retrieved.\"\n}"
+            },
+            {
+              "name": "422 — Missing query",
+              "status": "Unprocessable Content",
+              "code": 422,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Search query parameter \\\"q\\\" is required.\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Show Farmer Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/farmers/1", "host": ["{{base_url}}"], "path": ["api", "farmers", "1"] },
+            "description": "Returns the farmer profile including `total_outstanding_debt` (sum of all open/partial debt remaining_fcfa)."
+          },
+          "response": [
+            {
+              "name": "200 OK — Partial debt",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 1,\n    \"identifier\": \"CI-2024-001\",\n    \"firstname\": \"Konan\",\n    \"lastname\": \"Kouassi\",\n    \"phone_number\": \"+22507010001\",\n    \"credit_limit_fcfa\": 100000,\n    \"total_outstanding_debt\": 6400,\n    \"created_at\": \"2026-04-28T12:00:00.000000Z\"\n  },\n  \"message\": \"Farmer profile retrieved.\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Farmer not found.\",\n  \"errors\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Farmer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/farmers", "host": ["{{base_url}}"], "path": ["api", "farmers"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"identifier\": \"CI-2024-006\",\n  \"firstname\": \"Adjoumani\",\n  \"lastname\": \"Touré\",\n  \"phone_number\": \"+22507010006\",\n  \"credit_limit_fcfa\": 75000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "`identifier` and `phone_number` must be unique. `credit_limit_fcfa` minimum is 0."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 6,\n    \"identifier\": \"CI-2024-006\",\n    \"firstname\": \"Adjoumani\",\n    \"lastname\": \"Touré\",\n    \"phone_number\": \"+22507010006\",\n    \"credit_limit_fcfa\": 75000,\n    \"total_outstanding_debt\": 0,\n    \"created_at\": \"2026-04-28T15:00:00.000000Z\"\n  },\n  \"message\": \"Farmer created successfully.\"\n}"
+            },
+            {
+              "name": "422 Validation Error",
+              "status": "Unprocessable Content",
+              "code": 422,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Validation failed.\",\n  \"errors\": {\n    \"identifier\": [\"The identifier has already been taken.\"],\n    \"phone_number\": [\"The phone number has already been taken.\"]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "Create Transaction — Cash",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/transactions", "host": ["{{base_url}}"], "path": ["api", "transactions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"farmer_id\": 3,\n  \"payment_method\": \"cash\",\n  \"items\": [\n    { \"product_id\": 1, \"quantity\": 2 },\n    { \"product_id\": 10, \"quantity\": 1 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Cash transaction — no interest, no debt created. `items` array requires at least one entry."
+          },
+          "response": [
+            {
+              "name": "201 Created — Cash",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 7,\n    \"farmer\": { \"id\": 3, \"identifier\": \"CI-2024-003\", \"firstname\": \"Koffi\", \"lastname\": \"Assouman\" },\n    \"operator\": { \"id\": 4, \"name\": \"Amara Operator\" },\n    \"items\": [\n      { \"product_id\": 1, \"product_name\": \"Roundup 1L\", \"quantity\": 2, \"unit_price_fcfa\": 8500, \"subtotal_fcfa\": 17000 },\n      { \"product_id\": 10, \"product_name\": \"NPK 15-15-15 25kg\", \"quantity\": 1, \"unit_price_fcfa\": 18000, \"subtotal_fcfa\": 18000 }\n    ],\n    \"total_fcfa\": 35000,\n    \"payment_method\": \"cash\",\n    \"interest_rate\": null,\n    \"interest_amount_fcfa\": null,\n    \"debt\": null,\n    \"created_at\": \"2026-04-28T15:00:00.000000Z\"\n  },\n  \"message\": \"Transaction completed successfully.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Transaction — Credit",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/transactions", "host": ["{{base_url}}"], "path": ["api", "transactions"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"farmer_id\": 5,\n  \"payment_method\": \"credit\",\n  \"interest_rate\": 0.15,\n  \"items\": [\n    { \"product_id\": 19, \"quantity\": 4 },\n    { \"product_id\": 13, \"quantity\": 2 }\n  ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Credit transaction — `interest_rate` is required (0.0 to 1.0). A debt record is created automatically. Returns 422 if farmer's credit limit would be exceeded."
+          },
+          "response": [
+            {
+              "name": "201 Created — Credit with debt",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 8,\n    \"farmer\": { \"id\": 5, \"identifier\": \"CI-2024-005\", \"firstname\": \"Yao\", \"lastname\": \"N'Goran\" },\n    \"operator\": { \"id\": 4, \"name\": \"Amara Operator\" },\n    \"items\": [\n      { \"product_id\": 19, \"product_name\": \"Semence Maïs IKENNE 5kg\", \"quantity\": 4, \"unit_price_fcfa\": 6500, \"subtotal_fcfa\": 26000 },\n      { \"product_id\": 13, \"product_name\": \"Urée 46% 25kg\", \"quantity\": 2, \"unit_price_fcfa\": 16500, \"subtotal_fcfa\": 33000 }\n    ],\n    \"total_fcfa\": 67850,\n    \"payment_method\": \"credit\",\n    \"interest_rate\": \"0.1500\",\n    \"interest_amount_fcfa\": 8850,\n    \"debt\": {\n      \"id\": 4,\n      \"amount_fcfa\": 67850,\n      \"remaining_fcfa\": 67850,\n      \"status\": \"open\"\n    },\n    \"created_at\": \"2026-04-28T15:00:00.000000Z\"\n  },\n  \"message\": \"Transaction completed successfully.\"\n}"
+            },
+            {
+              "name": "422 — Credit limit exceeded",
+              "status": "Unprocessable Content",
+              "code": 422,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Credit limit exceeded. Available: 27600 FCFA\",\n  \"errors\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Debts",
+      "item": [
+        {
+          "name": "List Farmer Debts (FIFO order)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": { "raw": "{{base_url}}/api/farmers/1/debts", "host": ["{{base_url}}"], "path": ["api", "farmers", "1", "debts"] },
+            "description": "Returns all open and partial debts for the farmer, ordered by `created_at` ASC (oldest first = next to be repaid). Fully paid debts are excluded."
+          },
+          "response": [
+            {
+              "name": "200 OK — Partial debt for Konan",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [\n    {\n      \"id\": 1,\n      \"transaction_id\": 4,\n      \"amount_fcfa\": 26400,\n      \"remaining_fcfa\": 6400,\n      \"status\": \"partial\",\n      \"created_at\": \"2026-04-13T12:00:00.000000Z\"\n    }\n  ],\n  \"message\": \"Open debts retrieved successfully.\"\n}"
+            },
+            {
+              "name": "200 OK — No open debts (Adjoua, fully paid)",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": [],\n  \"message\": \"Open debts retrieved successfully.\"\n}"
+            },
+            {
+              "name": "404 — Farmer not found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Farmer not found.\",\n  \"errors\": []\n}"
+            }
+          ]
+        }
+      ]
+    },
+
+    {
+      "name": "Repayments",
+      "item": [
+        {
+          "name": "Record Repayment (FIFO)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type",  "value": "application/json" }
+            ],
+            "url": { "raw": "{{base_url}}/api/repayments", "host": ["{{base_url}}"], "path": ["api", "repayments"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"farmer_id\": 4,\n  \"kg_received\": 30.500,\n  \"commodity_rate_fcfa\": 1000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "Records a commodity repayment for a farmer.\n\n**FIFO logic:**\n1. `total_credited = round(kg_received × commodity_rate_fcfa)` = 30 500 FCFA\n2. Applies to oldest open/partial debt first (Amenan's 72 000 FCFA)\n3. Debt becomes `partial` with 41 500 FCFA remaining\n4. Any surplus beyond all debts is silently discarded\n\nThe response includes `debts_affected` with the `amount_applied_fcfa` pivot value for each settled debt."
+          },
+          "response": [
+            {
+              "name": "201 Created — Partial settlement",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 3,\n    \"farmer_id\": 4,\n    \"kg_received\": 30.5,\n    \"commodity_rate_fcfa\": 1000,\n    \"total_fcfa_credited\": 30500,\n    \"debts_affected\": [\n      {\n        \"id\": 3,\n        \"transaction_id\": 6,\n        \"amount_fcfa\": 72000,\n        \"remaining_fcfa\": 41500,\n        \"status\": \"partial\",\n        \"amount_applied_fcfa\": 30500\n      }\n    ],\n    \"created_at\": \"2026-04-28T16:00:00.000000Z\"\n  },\n  \"message\": \"Repayment recorded successfully.\"\n}"
+            },
+            {
+              "name": "201 Created — Full settlement with surplus",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"id\": 4,\n    \"farmer_id\": 1,\n    \"kg_received\": 10.0,\n    \"commodity_rate_fcfa\": 1000,\n    \"total_fcfa_credited\": 10000,\n    \"debts_affected\": [\n      {\n        \"id\": 1,\n        \"transaction_id\": 4,\n        \"amount_fcfa\": 26400,\n        \"remaining_fcfa\": 0,\n        \"status\": \"paid\",\n        \"amount_applied_fcfa\": 6400\n      }\n    ],\n    \"created_at\": \"2026-04-28T16:05:00.000000Z\"\n  },\n  \"message\": \"Repayment recorded successfully.\"\n}"
+            },
+            {
+              "name": "422 Validation Error",
+              "status": "Unprocessable Content",
+              "code": 422,
+              "body": "{\n  \"success\": false,\n  \"message\": \"Validation failed.\",\n  \"errors\": {\n    \"kg_received\": [\"The kg received field must be at least 0.001.\"],\n    \"commodity_rate_fcfa\": [\"The commodity rate fcfa field must be at least 1.\"]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+
+  ]
+}
