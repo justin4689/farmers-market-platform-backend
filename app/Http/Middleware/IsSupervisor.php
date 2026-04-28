@@ -1,0 +1,23 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
+
+class IsSupervisor
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if ($request->user()?->role !== 'supervisor') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden. Supervisor access required.',
+                'errors'  => [],
+            ], 403);
+        }
+
+        return $next($request);
+    }
+}
