@@ -27,6 +27,11 @@ class DebtRepository implements DebtRepositoryInterface
         return $debt->fresh();
     }
 
+    public function save(Debt $debt): void
+    {
+        $debt->save();
+    }
+
     public function findByFarmer(int $farmerId): Collection
     {
         return $this->model->where('farmer_id', $farmerId)->with('transaction')->get();

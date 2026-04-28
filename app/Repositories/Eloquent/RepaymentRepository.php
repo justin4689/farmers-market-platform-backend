@@ -42,4 +42,16 @@ class RepaymentRepository implements RepaymentRepositoryInterface
         $repayment = $this->model->findOrFail($repaymentId);
         $repayment->debts()->attach($debtId, ['amount_applied_fcfa' => $amountApplied]);
     }
+
+    public function attachDebts(int $repaymentId, array $debtAmounts): void
+    {
+        $repayment = $this->model->findOrFail($repaymentId);
+
+        $pivotData = [];
+        foreach ($debtAmounts as $debtId => $amount) {
+            $pivotData[$debtId] = ['amount_applied_fcfa' => $amount];
+        }
+
+        $repayment->debts()->attach($pivotData);
+    }
 }

@@ -2,8 +2,10 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\DebtController;
 use App\Http\Controllers\FarmerController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RepaymentController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +55,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // -----------------------------------------------------------------
     Route::middleware('role.operator_or_above')->group(function () {
         Route::post('/transactions', [TransactionController::class, 'store']);
+    });
+
+    // -----------------------------------------------------------------
+    // Debts & Repayments — operator and above
+    // -----------------------------------------------------------------
+    Route::middleware('role.operator_or_above')->group(function () {
+        Route::get('/farmers/{id}/debts', [DebtController::class, 'index']);
+        Route::post('/repayments',        [RepaymentController::class, 'store']);
     });
 
     // -----------------------------------------------------------------

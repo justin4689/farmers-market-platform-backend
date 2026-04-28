@@ -13,4 +13,7 @@ interface RepaymentRepositoryInterface
     public function findByFarmer(int $farmerId): Collection;
     public function findWithDebts(int $id): ?Repayment;
     public function attachDebt(int $repaymentId, int $debtId, int $amountApplied): void;
+
+    /** @param array<int, int> $debtAmounts  [debt_id => amount_applied_fcfa] */
+    public function attachDebts(int $repaymentId, array $debtAmounts): void;
 }
