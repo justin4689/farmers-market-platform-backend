@@ -20,6 +20,30 @@ class FarmerRepository implements FarmerRepositoryInterface
         return $this->model->find($id);
     }
 
+    public function findWithDebt(int $id): ?Farmer
+    {
+        return $this->model
+            ->withSum(
+                ['debts as total_outstanding_debt' => fn ($q) => $q->whereIn('status', ['open', 'partial'])],
+                'remaining_fcfa'
+            )
+            ->find($id);
+    }
+
+    public function search(string $query): Collection
+    {
+        return $this->model
+            ->where(fn ($q) => $q
+                ->where('identifier', 'like', "%{$query}%")
+                ->orWhere('phone_number', 'like', "%{$query}%")
+            )
+            ->withSum(
+                ['debts as total_outstanding_debt' => fn ($q) => $q->whereIn('status', ['open', 'partial'])],
+                'remaining_fcfa'
+            )
+            ->get();
+    }
+
     public function findByIdentifier(string $identifier): ?Farmer
     {
         return $this->model->where('identifier', $identifier)->first();

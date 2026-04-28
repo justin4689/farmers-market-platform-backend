@@ -9,7 +9,9 @@ interface FarmerRepositoryInterface
 {
     public function all(): Collection;
     public function find(int $id): ?Farmer;
+    public function findWithDebt(int $id): ?Farmer;
     public function findByIdentifier(string $identifier): ?Farmer;
+    public function search(string $query): Collection;
     public function create(array $data): Farmer;
     public function update(int $id, array $data): Farmer;
     public function delete(int $id): bool;
