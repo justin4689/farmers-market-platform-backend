@@ -12,7 +12,7 @@ class TransactionItemRepository implements TransactionItemRepositoryInterface
 
     public function createMany(int $transactionId, array $items): Collection
     {
-        $created = collect();
+        $created = new Collection();
         foreach ($items as $item) {
             $created->push($this->model->create(array_merge($item, ['transaction_id' => $transactionId])));
         }

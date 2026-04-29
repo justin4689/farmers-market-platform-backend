@@ -36,6 +36,8 @@ class FarmerRepository implements FarmerRepositoryInterface
             ->where(fn ($q) => $q
                 ->where('identifier', 'like', "%{$query}%")
                 ->orWhere('phone_number', 'like', "%{$query}%")
+                ->orWhere('firstname', 'like', "%{$query}%")
+                ->orWhere('lastname', 'like', "%{$query}%")
             )
             ->withSum(
                 ['debts as total_outstanding_debt' => fn ($q) => $q->whereIn('status', ['open', 'partial'])],
