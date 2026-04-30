@@ -32,7 +32,7 @@ class TransactionResource extends JsonResource
                 'remaining_fcfa' => $this->debt->remaining_fcfa,
                 'status'         => $this->debt->status,
             ] : null),
-            'created_at'           => $this->created_at->toISOString(),
+            'created_at'           => $this->created_at->format('Y-m-d H:i:s'),
         ];
     }
 }

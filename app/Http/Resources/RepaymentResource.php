@@ -25,7 +25,7 @@ class RepaymentResource extends JsonResource
                     'amount_applied_fcfa' => $debt->pivot->amount_applied_fcfa,
                 ])->values()
             ),
-            'created_at'           => $this->created_at->toISOString(),
+            'created_at'           => $this->created_at->format('Y-m-d H:i:s'),
         ];
     }
 }
