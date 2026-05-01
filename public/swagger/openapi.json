@@ -1,0 +1,870 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Farmers Market Platform API",
+    "description": "API REST pour une marketplace agricole en Côte d'Ivoire. Les agriculteurs achètent des pesticides, engrais et semences à crédit ou comptant. Les dettes sont remboursées en commodités (cacao en kg).\n\n## Authentification\nChaque requête authentifiée doit inclure le header :\n```\nAuthorization: Bearer {token}\n```\nObtenir le token via `POST /api/login`.\n\n## Format de réponse\nToutes les réponses utilisent la même enveloppe :\n```json\n{ \"success\": true|false, \"data\": {...}, \"message\": \"...\" }\n```",
+    "version": "1.0.0",
+    "contact": { "email": "admin@xpertbot.com" }
+  },
+  "servers": [
+    { "url": "http://localhost:8000", "description": "Serveur local (php artisan serve)" }
+  ],
+  "tags": [
+    { "name": "Auth",         "description": "Authentification Sanctum" },
+    { "name": "Users",        "description": "Gestion des comptes utilisateurs (admin/supervisor)" },
+    { "name": "Categories",   "description": "Gestion des catégories de produits (arbre récursif)" },
+    { "name": "Products",     "description": "Gestion du catalogue produits" },
+    { "name": "Farmers",      "description": "Gestion des agriculteurs et profils de dette" },
+    { "name": "Transactions", "description": "Enregistrement des achats (comptant ou crédit)" },
+    { "name": "Debts",        "description": "Consultation des dettes FIFO" },
+    { "name": "Repayments",   "description": "Remboursements en commodités (logique FIFO)" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Sanctum",
+        "description": "Token obtenu via POST /api/login"
+      }
+    },
+    "schemas": {
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "data":    { "type": "object" },
+          "message": { "type": "string", "example": "Opération réussie." }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Message d'erreur." },
+          "errors":  { "type": "object", "example": {} }
+        }
+      },
+      "ValidationError": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "message": { "type": "string", "example": "Validation failed." },
+          "errors": {
+            "type": "object",
+            "additionalProperties": { "type": "array", "items": { "type": "string" } },
+            "example": { "email": ["The email field is required."] }
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id":         { "type": "integer", "example": 4 },
+          "name":       { "type": "string",  "example": "Amara Operator" },
+          "email":      { "type": "string",  "format": "email", "example": "operator1@xpertbot.com" },
+          "role":       { "type": "string",  "enum": ["admin","supervisor","operator"] },
+          "created_by": { "type": "integer", "nullable": true, "example": 2 },
+          "created_at": { "type": "string",  "format": "date-time" }
+        }
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id":        { "type": "integer", "example": 1 },
+          "name":      { "type": "string",  "example": "Pesticides" },
+          "parent_id": { "type": "integer", "nullable": true, "example": null },
+          "children":  { "type": "array", "items": { "$ref": "#/components/schemas/Category" } }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id":          { "type": "integer", "example": 1 },
+          "name":        { "type": "string",  "example": "Roundup 1L" },
+          "price_fcfa":  { "type": "integer", "example": 8500 },
+          "description": { "type": "string",  "example": "Herbicide systémique à base de glyphosate" },
+          "category": {
+            "type": "object",
+            "properties": {
+              "id":   { "type": "integer", "example": 2 },
+              "name": { "type": "string",  "example": "Herbicides" }
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Farmer": {
+        "type": "object",
+        "properties": {
+          "id":                     { "type": "integer", "example": 1 },
+          "identifier":             { "type": "string",  "example": "CI-2024-001" },
+          "firstname":              { "type": "string",  "example": "Konan" },
+          "lastname":               { "type": "string",  "example": "Kouassi" },
+          "phone_number":           { "type": "string",  "example": "+22507010001" },
+          "credit_limit_fcfa":      { "type": "integer", "example": 100000 },
+          "total_outstanding_debt": { "type": "integer", "example": 6400 },
+          "created_at":             { "type": "string",  "format": "date-time" }
+        }
+      },
+      "TransactionItem": {
+        "type": "object",
+        "properties": {
+          "product_id":      { "type": "integer", "example": 1 },
+          "product_name":    { "type": "string",  "example": "Roundup 1L" },
+          "quantity":        { "type": "integer", "example": 2 },
+          "unit_price_fcfa": { "type": "integer", "example": 8500 },
+          "subtotal_fcfa":   { "type": "integer", "example": 17000 }
+        }
+      },
+      "Debt": {
+        "type": "object",
+        "properties": {
+          "id":             { "type": "integer", "example": 1 },
+          "transaction_id": { "type": "integer", "example": 4 },
+          "amount_fcfa":    { "type": "integer", "example": 26400 },
+          "remaining_fcfa": { "type": "integer", "example": 6400 },
+          "status":         { "type": "string",  "enum": ["open","partial","paid"], "example": "partial" },
+          "created_at":     { "type": "string",  "format": "date-time" }
+        }
+      },
+      "Transaction": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "example": 7 },
+          "farmer": {
+            "type": "object",
+            "properties": {
+              "id":         { "type": "integer", "example": 1 },
+              "identifier": { "type": "string",  "example": "CI-2024-001" },
+              "firstname":  { "type": "string",  "example": "Konan" },
+              "lastname":   { "type": "string",  "example": "Kouassi" }
+            }
+          },
+          "operator": {
+            "type": "object",
+            "properties": {
+              "id":   { "type": "integer", "example": 4 },
+              "name": { "type": "string",  "example": "Amara Operator" }
+            }
+          },
+          "items":                { "type": "array", "items": { "$ref": "#/components/schemas/TransactionItem" } },
+          "total_fcfa":           { "type": "integer", "example": 35000 },
+          "payment_method":       { "type": "string",  "enum": ["cash","credit"] },
+          "interest_rate":        { "type": "number",  "format": "float", "nullable": true, "example": 0.15 },
+          "interest_amount_fcfa": { "type": "integer", "nullable": true, "example": 5250 },
+          "debt":                 { "$ref": "#/components/schemas/Debt", "nullable": true },
+          "created_at":           { "type": "string", "format": "date-time" }
+        }
+      },
+      "Repayment": {
+        "type": "object",
+        "properties": {
+          "id":                  { "type": "integer", "example": 1 },
+          "farmer_id":           { "type": "integer", "example": 1 },
+          "kg_received":         { "type": "number",  "format": "float", "example": 20.0 },
+          "commodity_rate_fcfa": { "type": "integer", "example": 1000 },
+          "total_fcfa_credited": { "type": "integer", "example": 20000 },
+          "debts_affected": {
+            "type": "array",
+            "items": {
+              "allOf": [
+                { "$ref": "#/components/schemas/Debt" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "amount_applied_fcfa": { "type": "integer", "example": 20000 }
+                  }
+                }
+              ]
+            }
+          },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "responses": {
+      "Unauthenticated": {
+        "description": "Non authentifié — token absent ou révoqué",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "success": false, "message": "Unauthenticated.", "errors": {} }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Rôle insuffisant",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "success": false, "message": "Forbidden. Admin access required.", "errors": {} }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Ressource introuvable",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": { "success": false, "message": "Resource not found.", "errors": {} }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "Erreur de validation",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ValidationError" }
+          }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+
+    "/api/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Connexion",
+        "description": "Authentifie l'utilisateur et retourne un token Sanctum. Le token doit être passé dans `Authorization: Bearer {token}` pour toutes les requêtes suivantes.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email","password"],
+                "properties": {
+                  "email":    { "type": "string", "format": "email", "example": "operator1@xpertbot.com" },
+                  "password": { "type": "string", "example": "password" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Connexion réussie — token retourné",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [{ "$ref": "#/components/schemas/SuccessResponse" }]
+                },
+                "example": {
+                  "success": true,
+                  "data": {
+                    "token": "1|abcdefghijklmnop",
+                    "user": { "id": 4, "name": "Amara Operator", "email": "operator1@xpertbot.com", "role": "operator", "created_by": 2, "created_at": "2026-04-28T12:00:00.000000Z" }
+                  },
+                  "message": "Login successful."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Identifiants incorrects",
+            "content": {
+              "application/json": {
+                "example": { "success": false, "message": "Invalid email or password.", "errors": [] }
+              }
+            }
+          },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/api/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Déconnexion",
+        "description": "Révoque le token Sanctum courant.",
+        "responses": {
+          "200": {
+            "description": "Déconnexion réussie",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": [], "message": "Logged out successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" }
+        }
+      }
+    },
+
+    "/api/admin/supervisors": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Créer un superviseur",
+        "description": "Accessible uniquement aux **admins**. Crée un compte superviseur avec `created_by` = l'admin connecté.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","email","password"],
+                "properties": {
+                  "name":     { "type": "string", "example": "Kone Superviseur" },
+                  "email":    { "type": "string", "format": "email", "example": "kone.sup@xpertbot.com" },
+                  "password": { "type": "string", "minLength": 8, "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Superviseur créé",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 7, "name": "Kone Superviseur", "email": "kone.sup@xpertbot.com", "role": "supervisor", "created_by": 1, "created_at": "2026-04-28T15:00:00.000000Z" }, "message": "Supervisor created successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/api/supervisor/operators": {
+      "post": {
+        "tags": ["Users"],
+        "summary": "Créer un opérateur",
+        "description": "Accessible uniquement aux **superviseurs**. Crée un compte opérateur avec `created_by` = le superviseur connecté.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","email","password"],
+                "properties": {
+                  "name":     { "type": "string", "example": "Diallo Opérateur" },
+                  "email":    { "type": "string", "format": "email", "example": "diallo.op@xpertbot.com" },
+                  "password": { "type": "string", "minLength": 8, "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Opérateur créé",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 8, "name": "Diallo Opérateur", "email": "diallo.op@xpertbot.com", "role": "operator", "created_by": 2, "created_at": "2026-04-28T15:00:00.000000Z" }, "message": "Operator created successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/api/categories": {
+      "get": {
+        "tags": ["Categories"],
+        "summary": "Liste des catégories (arbre récursif)",
+        "description": "Retourne toutes les catégories racines avec leurs enfants imbriqués récursivement. Une seule requête SQL.",
+        "responses": {
+          "200": {
+            "description": "Arbre de catégories",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": [
+                    { "id": 1, "name": "Pesticides", "parent_id": null, "children": [
+                      { "id": 2, "name": "Herbicides",   "parent_id": 1, "children": [] },
+                      { "id": 3, "name": "Insecticides", "parent_id": 1, "children": [] },
+                      { "id": 4, "name": "Fongicides",   "parent_id": 1, "children": [] }
+                    ]},
+                    { "id": 5, "name": "Engrais", "parent_id": null, "children": [
+                      { "id": 6, "name": "NPK",  "parent_id": 5, "children": [] },
+                      { "id": 7, "name": "Urée", "parent_id": 5, "children": [] },
+                      { "id": 8, "name": "Engrais organiques", "parent_id": 5, "children": [] }
+                    ]}
+                  ],
+                  "message": "Categories retrieved successfully."
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" }
+        }
+      },
+      "post": {
+        "tags": ["Categories"],
+        "summary": "Créer une catégorie",
+        "description": "Admin ou superviseur uniquement. Laisser `parent_id` à null pour une catégorie racine.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name":      { "type": "string", "example": "Matériel agricole" },
+                  "parent_id": { "type": "integer", "nullable": true, "example": null }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Catégorie créée",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 13, "name": "Matériel agricole", "parent_id": null, "children": [] }, "message": "Category created successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/api/categories/{id}": {
+      "put": {
+        "tags": ["Categories"],
+        "summary": "Modifier une catégorie",
+        "description": "Admin ou superviseur. Une catégorie ne peut pas être son propre parent.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 2 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name":      { "type": "string",  "example": "Herbicides & Défoliants" },
+                  "parent_id": { "type": "integer", "nullable": true, "example": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Catégorie mise à jour",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 2, "name": "Herbicides & Défoliants", "parent_id": 1, "children": [] }, "message": "Category updated successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      },
+      "delete": {
+        "tags": ["Categories"],
+        "summary": "Supprimer une catégorie",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 13 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Supprimée",
+            "content": { "application/json": { "example": { "success": true, "data": [], "message": "Category deleted successfully." } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+
+    "/api/products": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Liste des produits",
+        "description": "Retourne tous les produits avec leur catégorie (id + nom) imbriquée.",
+        "responses": {
+          "200": {
+            "description": "Liste des produits",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": [
+                    { "id": 1, "name": "Roundup 1L", "price_fcfa": 8500, "description": "Herbicide systémique", "category": { "id": 2, "name": "Herbicides" }, "created_at": "2026-04-28T12:00:00.000000Z" }
+                  ],
+                  "message": "Products retrieved successfully."
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" }
+        }
+      },
+      "post": {
+        "tags": ["Products"],
+        "summary": "Créer un produit",
+        "description": "Admin ou superviseur. `price_fcfa` minimum 1 FCFA.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","category_id","price_fcfa"],
+                "properties": {
+                  "name":        { "type": "string",  "example": "Glyphosate 500ml" },
+                  "category_id": { "type": "integer", "example": 2 },
+                  "price_fcfa":  { "type": "integer", "minimum": 1, "example": 4200 },
+                  "description": { "type": "string",  "nullable": true, "example": "Herbicide concentré" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Produit créé",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 24, "name": "Glyphosate 500ml", "price_fcfa": 4200, "description": "Herbicide concentré", "category": { "id": 2, "name": "Herbicides" }, "created_at": "2026-04-28T15:00:00.000000Z" }, "message": "Product created successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/api/products/{id}": {
+      "get": {
+        "tags": ["Products"],
+        "summary": "Afficher un produit",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Produit trouvé",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 1, "name": "Roundup 1L", "price_fcfa": 8500, "description": "Herbicide systémique", "category": { "id": 2, "name": "Herbicides" }, "created_at": "2026-04-28T12:00:00.000000Z" }, "message": "Product retrieved successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "tags": ["Products"],
+        "summary": "Modifier un produit",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name","category_id","price_fcfa"],
+                "properties": {
+                  "name":        { "type": "string",  "example": "Roundup 2L" },
+                  "category_id": { "type": "integer", "example": 2 },
+                  "price_fcfa":  { "type": "integer", "minimum": 1, "example": 15000 },
+                  "description": { "type": "string",  "nullable": true, "example": "Format économique" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Produit mis à jour", "content": { "application/json": { "example": { "success": true, "data": { "id": 1, "name": "Roundup 2L", "price_fcfa": 15000, "description": "Format économique", "category": { "id": 2, "name": "Herbicides" }, "created_at": "2026-04-28T12:00:00.000000Z" }, "message": "Product updated successfully." } } } },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      },
+      "delete": {
+        "tags": ["Products"],
+        "summary": "Supprimer un produit",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": {
+          "200": { "description": "Supprimé", "content": { "application/json": { "example": { "success": true, "data": [], "message": "Product deleted successfully." } } } },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+
+    "/api/farmers/search": {
+      "get": {
+        "tags": ["Farmers"],
+        "summary": "Rechercher un agriculteur",
+        "description": "Recherche par `identifier` (ex: CI-2024-001) ou `phone_number`. Retourne `total_outstanding_debt` pour chaque résultat — calculé via une seule requête SQL (`withSum`).",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Terme de recherche (identifiant ou téléphone)", "example": "CI-2024" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Résultats de recherche",
+            "content": {
+              "application/json": {
+                "example": {
+                  "success": true,
+                  "data": [
+                    { "id": 1, "identifier": "CI-2024-001", "firstname": "Konan", "lastname": "Kouassi", "phone_number": "+22507010001", "credit_limit_fcfa": 100000, "total_outstanding_debt": 6400, "created_at": "2026-04-28T12:00:00.000000Z" }
+                  ],
+                  "message": "Search results retrieved."
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "422": {
+            "description": "Paramètre `q` manquant",
+            "content": { "application/json": { "example": { "success": false, "message": "Search query parameter \"q\" is required.", "errors": [] } } }
+          }
+        }
+      }
+    },
+
+    "/api/farmers/{id}": {
+      "get": {
+        "tags": ["Farmers"],
+        "summary": "Profil d'un agriculteur",
+        "description": "Retourne le profil complet de l'agriculteur avec `total_outstanding_debt` = somme des `remaining_fcfa` des dettes `open` et `partial`.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "example": 1 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Profil agriculteur",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 1, "identifier": "CI-2024-001", "firstname": "Konan", "lastname": "Kouassi", "phone_number": "+22507010001", "credit_limit_fcfa": 100000, "total_outstanding_debt": 6400, "created_at": "2026-04-28T12:00:00.000000Z" }, "message": "Farmer profile retrieved." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/farmers": {
+      "post": {
+        "tags": ["Farmers"],
+        "summary": "Enregistrer un agriculteur",
+        "description": "`identifier` et `phone_number` doivent être uniques. `credit_limit_fcfa` minimum 0.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["identifier","firstname","lastname","phone_number","credit_limit_fcfa"],
+                "properties": {
+                  "identifier":        { "type": "string",  "example": "CI-2024-006" },
+                  "firstname":         { "type": "string",  "example": "Adjoumani" },
+                  "lastname":          { "type": "string",  "example": "Touré" },
+                  "phone_number":      { "type": "string",  "example": "+22507010006" },
+                  "credit_limit_fcfa": { "type": "integer", "minimum": 0, "example": 75000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Agriculteur créé",
+            "content": {
+              "application/json": {
+                "example": { "success": true, "data": { "id": 6, "identifier": "CI-2024-006", "firstname": "Adjoumani", "lastname": "Touré", "phone_number": "+22507010006", "credit_limit_fcfa": 75000, "total_outstanding_debt": 0, "created_at": "2026-04-28T15:00:00.000000Z" }, "message": "Farmer created successfully." }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    },
+
+    "/api/transactions": {
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "Enregistrer une transaction",
+        "description": "Crée une transaction pour un agriculteur.\n\n**Comptant (`cash`)** — aucune dette créée.\n\n**Crédit (`credit`)** — `interest_rate` requis (0.0 à 1.0). Calcul :\n```\ninterest_amount = round(subtotal × interest_rate)\ntotal = subtotal + interest_amount\n```\nUne dette est créée automatiquement. Retourne HTTP 422 si le plafond de crédit est dépassé.\n\nToute l'opération est atomique (`DB::transaction`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["farmer_id","payment_method","items"],
+                "properties": {
+                  "farmer_id":      { "type": "integer", "example": 5 },
+                  "payment_method": { "type": "string",  "enum": ["cash","credit"], "example": "credit" },
+                  "interest_rate":  { "type": "number",  "format": "float", "minimum": 0, "maximum": 1, "example": 0.15, "description": "Requis si payment_method=credit" },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["product_id","quantity"],
+                      "properties": {
+                        "product_id": { "type": "integer", "example": 19 },
+                        "quantity":   { "type": "integer", "minimum": 1, "example": 4 }
+                      }
+                    }
+                  }
+                }
+              },
+              "examples": {
+                "cash": {
+                  "summary": "Achat comptant",
+                  "value": { "farmer_id": 3, "payment_method": "cash", "items": [{ "product_id": 1, "quantity": 2 }, { "product_id": 10, "quantity": 1 }] }
+                },
+                "credit": {
+                  "summary": "Achat à crédit (15%)",
+                  "value": { "farmer_id": 5, "payment_method": "credit", "interest_rate": 0.15, "items": [{ "product_id": 19, "quantity": 4 }, { "product_id": 13, "quantity": 2 }] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transaction créée",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "cash": {
+                    "summary": "Achat comptant",
+                    "value": { "success": true, "data": { "id": 7, "farmer": { "id": 3, "identifier": "CI-2024-003", "firstname": "Koffi", "lastname": "Assouman" }, "operator": { "id": 4, "name": "Amara Operator" }, "items": [{ "product_id": 1, "product_name": "Roundup 1L", "quantity": 2, "unit_price_fcfa": 8500, "subtotal_fcfa": 17000 }], "total_fcfa": 35000, "payment_method": "cash", "interest_rate": null, "interest_amount_fcfa": null, "debt": null, "created_at": "2026-04-28T15:00:00.000000Z" }, "message": "Transaction completed successfully." }
+                  },
+                  "credit": {
+                    "summary": "Achat à crédit",
+                    "value": { "success": true, "data": { "id": 8, "farmer": { "id": 5, "identifier": "CI-2024-005", "firstname": "Yao", "lastname": "N'Goran" }, "operator": { "id": 4, "name": "Amara Operator" }, "items": [{ "product_id": 19, "product_name": "Semence Maïs IKENNE 5kg", "quantity": 4, "unit_price_fcfa": 6500, "subtotal_fcfa": 26000 }], "total_fcfa": 67850, "payment_method": "credit", "interest_rate": "0.1500", "interest_amount_fcfa": 8850, "debt": { "id": 4, "amount_fcfa": 67850, "remaining_fcfa": 67850, "status": "open" }, "created_at": "2026-04-28T15:00:00.000000Z" }, "message": "Transaction completed successfully." }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "422": {
+            "description": "Validation ou plafond de crédit dépassé",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "validation": { "summary": "Erreur de validation", "value": { "success": false, "message": "Validation failed.", "errors": { "items": ["The items field must have at least 1 items."] } } },
+                  "credit_limit": { "summary": "Plafond dépassé", "value": { "success": false, "message": "Credit limit exceeded. Available: 27600 FCFA", "errors": [] } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "/api/farmers/{id}/debts": {
+      "get": {
+        "tags": ["Debts"],
+        "summary": "Dettes d'un agriculteur (ordre FIFO)",
+        "description": "Retourne les dettes `open` et `partial` de l'agriculteur, triées par `created_at` ASC (la plus ancienne en premier = prochain à rembourser). Les dettes `paid` sont exclues.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "ID de l'agriculteur", "example": 4 }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des dettes actives",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "open": {
+                    "summary": "Dette ouverte (Farmer 4 — Amenan)",
+                    "value": { "success": true, "data": [{ "id": 3, "transaction_id": 6, "amount_fcfa": 72000, "remaining_fcfa": 72000, "status": "open", "created_at": "2026-04-23T12:00:00.000000Z" }], "message": "Open debts retrieved successfully." }
+                  },
+                  "partial": {
+                    "summary": "Dette partielle (Farmer 1 — Konan)",
+                    "value": { "success": true, "data": [{ "id": 1, "transaction_id": 4, "amount_fcfa": 26400, "remaining_fcfa": 6400, "status": "partial", "created_at": "2026-04-13T12:00:00.000000Z" }], "message": "Open debts retrieved successfully." }
+                  },
+                  "empty": {
+                    "summary": "Aucune dette (Farmer 2 — Adjoua, tout remboursé)",
+                    "value": { "success": true, "data": [], "message": "Open debts retrieved successfully." }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/repayments": {
+      "post": {
+        "tags": ["Repayments"],
+        "summary": "Enregistrer un remboursement",
+        "description": "Enregistre un remboursement en commodités (kg de cacao).\n\n**Algorithme FIFO :**\n1. `total_crédité = round(kg_received × commodity_rate_fcfa)`\n2. Applique ce montant aux dettes les plus anciennes en premier\n3. Chaque dette devient `partial` (si couverture partielle) ou `paid` (si totalement soldée)\n4. Le surplus au-delà de toutes les dettes est ignoré\n\nToute l'opération est atomique (`DB::transaction`).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["farmer_id","kg_received","commodity_rate_fcfa"],
+                "properties": {
+                  "farmer_id":           { "type": "integer", "example": 4 },
+                  "kg_received":         { "type": "number", "format": "float", "minimum": 0.001, "example": 30.5 },
+                  "commodity_rate_fcfa": { "type": "integer", "minimum": 1, "example": 1000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Remboursement enregistré avec dettes affectées",
+            "content": {
+              "application/json": {
+                "examples": {
+                  "partial": {
+                    "summary": "Remboursement partiel — 30 500 FCFA sur dette de 72 000 FCFA",
+                    "value": { "success": true, "data": { "id": 3, "farmer_id": 4, "kg_received": 30.5, "commodity_rate_fcfa": 1000, "total_fcfa_credited": 30500, "debts_affected": [{ "id": 3, "transaction_id": 6, "amount_fcfa": 72000, "remaining_fcfa": 41500, "status": "partial", "amount_applied_fcfa": 30500 }], "created_at": "2026-04-28T16:00:00.000000Z" }, "message": "Repayment recorded successfully." }
+                  },
+                  "full": {
+                    "summary": "Remboursement total avec surplus ignoré",
+                    "value": { "success": true, "data": { "id": 4, "farmer_id": 1, "kg_received": 10.0, "commodity_rate_fcfa": 1000, "total_fcfa_credited": 10000, "debts_affected": [{ "id": 1, "transaction_id": 4, "amount_fcfa": 26400, "remaining_fcfa": 0, "status": "paid", "amount_applied_fcfa": 6400 }], "created_at": "2026-04-28T16:05:00.000000Z" }, "message": "Repayment recorded successfully." }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthenticated" },
+          "422": { "$ref": "#/components/responses/UnprocessableEntity" }
+        }
+      }
+    }
+
+  }
+}

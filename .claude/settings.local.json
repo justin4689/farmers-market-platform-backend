@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(php -r ' *)"
+      "Bash(php -r ' *)",
+      "Bash(composer require *)",
+      "Bash(php -r \"echo class_exists\\('L5Swagger\\\\L5SwaggerServiceProvider'\\) ? 'installed' : 'not yet';\")",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(php -r \"require 'vendor/autoload.php'; echo class_exists\\('L5Swagger\\\\L5SwaggerServiceProvider'\\) ? 'yes' : 'no';\")"
     ]
   }
 }
