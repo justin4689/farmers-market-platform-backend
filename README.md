@@ -192,7 +192,7 @@ repayment_debt      id, repayment_id, debt_id, amount_applied_fcfa, timestamps  
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/YOUR_USERNAME/farmers-market-platform-backend.git
+git clone https://github.com/justin4689/farmers-market-platform-backend.git
 cd farmers-market-platform-backend
 
 # 2. Install PHP dependencies
@@ -206,9 +206,9 @@ php artisan key:generate
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=farmers_market
-DB_USERNAME=farmers_user
-DB_PASSWORD=Laravel@2026
+DB_DATABASE=farmers_market_platform_backend
+DB_USERNAME=root
+DB_PASSWORD=
 
 # 5. Run database migrations and seed demo data
 php artisan migrate --seed
@@ -433,8 +433,9 @@ DB_CONNECTION=mysql
 DB_HOST=your-db-host
 DB_PORT=3306
 DB_DATABASE=farmers_market
-DB_USERNAME=your-db-user
-DB_PASSWORD=your-db-password
+DB_USERNAME=farmers_user
+DB_PASSWORD=Laravel@2026
+
 
 SANCTUM_EXPIRATION=1440
 ```
@@ -496,7 +497,7 @@ Full Stack Developer — XpertBot Academy Technical Assessment, 2026
 | | |
 |---|---|
 | Email | justintrah8@gmail.com |
-| GitHub | [github.com/YOUR_USERNAME](https://github.com/justin4689) |
+| GitHub | [github.com/justin4689](https://github.com/justin4689) |
 | Assessment platform | [xpertbotacademy.online](https://xpertbotacademy.online) |
 
 ---
