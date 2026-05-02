@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(findstr -i swagger)",
+      "Bash(Copy-Item \"c:\\\\Users\\\\JUSTIN\\\\Desktop\\\\Laravel  Project\\\\farmers-market-platform-backend\\\\vendor\\\\darkaonline\\\\l5-swagger\\\\config\\\\l5-swagger.php\" \"c:\\\\Users\\\\JUSTIN\\\\Desktop\\\\Laravel  Project\\\\farmers-market-platform-backend\\\\config\\\\l5-swagger.php\")"
+    ]
+  }
+}

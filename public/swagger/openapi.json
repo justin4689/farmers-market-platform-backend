@@ -7,6 +7,7 @@
     "contact": { "email": "admin@xpertbot.com" }
   },
   "servers": [
+    { "url": "https://challenging-behind-definitions-says.trycloudflare.com", "description": "Production (Cloudflare Tunnel)" },
     { "url": "http://localhost:8000", "description": "Serveur local (php artisan serve)" }
   ],
   "tags": [
